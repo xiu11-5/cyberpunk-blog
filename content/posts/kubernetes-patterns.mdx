@@ -1,0 +1,125 @@
+---
+title: Essential Kubernetes Design Patterns for Production
+excerpt: Learn the key patterns for building resilient, scalable microservices on Kubernetes - sidecar, ambassador, and more.
+date: '2024-12-10'
+tags:
+  - Kubernetes
+  - DevOps
+  - Cloud Native
+  - Microservices
+---
+
+Kubernetes has become the de facto platform for deploying containerized applications. Beyond basic deployments, understanding design patterns is crucial for building production-ready systems.
+
+## The Sidecar Pattern
+
+The sidecar pattern involves deploying a secondary container alongside your main application container within the same Pod. This secondary container enhances or extends the functionality of the main application.
+
+### Common Sidecar Use Cases
+
+- **Logging**: Fluent Bit or Filebeat shipping logs
+- **Monitoring**: Prometheus exporters
+- **Configuration**: Reloader watching ConfigMaps
+- **Proxy**: Envoy for service mesh
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app
+spec:
+  containers:
+    - name: main-app
+      image: my-app:1.0
+    - name: nginx-sidecar
+      image: nginx:alpine
+      volumeMounts:
+        - name: logs
+          mountPath: /var/log/nginx
+```
+
+## The Ambassador Pattern
+
+An ambassador container acts as a proxy between the main application and external services. This pattern is useful for:
+
+- Connection pooling and retries
+- Circuit breaking
+- Protocol translation
+- Authentication
+
+```yaml
+containers:
+  - name: main-app
+    image: my-app:1.0
+    env:
+      - name: REDIS_URL
+        value: "localhost:6379"
+  - name: redis-ambassador
+    image: redis-ambassador:latest
+```
+
+## The Adapter Pattern
+
+Adapters normalize output or interfaces between components. For example, ensuring all containers expose metrics in a consistent format for Prometheus.
+
+## Init Containers
+
+Init containers run before the main application containers start. They're perfect for:
+
+- Database migrations
+- Configuration generation
+- Waiting for dependencies
+
+```yaml
+initContainers:
+  - name: db-migrate
+    image: my-app:1.0
+    command: ['npm', 'run', 'migrate']
+  - name: wait-for-db
+    image: busybox
+    command: ['sh', '-c', 'until nc -z db 5432; do sleep 2; done']
+```
+
+## Operator Pattern
+
+Operators encode operational knowledge into software. They use custom resources to manage complex applications:
+
+```yaml
+apiVersion: databases.example.com/v1
+kind: PostgresCluster
+metadata:
+  name: production-db
+spec:
+  replicas: 3
+  storage: 100Gi
+  backup:
+    schedule: "0 2 * * *"
+```
+
+## Health Probes
+
+Proper health checks are essential for reliability:
+
+- **Liveness**: Is the container running? Restart if not.
+- **Readiness**: Is the container ready to serve traffic?
+- **Startup**: For slow-starting containers
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 3
+```
+
+## Conclusion
+
+These patterns provide building blocks for creating resilient, maintainable Kubernetes applications. By understanding and applying these patterns, you can build systems that handle failures gracefully and scale efficiently.
